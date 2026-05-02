@@ -18,13 +18,13 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({
-  children
+  children,
+}: {
+  children: React.ReactNode
 }) {
   return (
-    <html lan="en">
-      <body className="bg-neutral-100 text-black">
-        {children}
-      </body>
-      </html>
+    <html lang="en">
+      ...
+    </html>
   )
 }
