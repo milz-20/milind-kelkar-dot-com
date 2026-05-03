@@ -16,5 +16,6 @@ export const CATEGORIES = [
   'Node.js',
   'Next.js',
   'PCB',
+  'Web Vulnerabilities',
   'Other',
 ]
