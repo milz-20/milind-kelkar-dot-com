@@ -91,7 +91,7 @@ export default function NoteDetailPage() {
           <div className="blob blob-3" />
         </div>
 
-        <div className="relative z-10" style={{ maxWidth: '760px', margin: '0 auto', padding: '56px 24px 100px' }}>
+        <div className="relative z-10" style={{ maxWidth: '1400px', margin: '0 auto', padding: '56px 24px 100px' }}>
 
           <Link href="/" style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
