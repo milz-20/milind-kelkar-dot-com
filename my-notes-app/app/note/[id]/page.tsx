@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, Tag, Pencil, Trash2 } from 'lucide-react'
 import { Note } from '@/lib/notes'
+import { useSession } from 'next-auth/react'
 
 export default function NoteDetailPage() {
   const params = useParams()
@@ -13,6 +14,8 @@ export default function NoteDetailPage() {
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const { data: session } = useSession()
+  const isAdmin = !!session
 
   useEffect(() => {
     if (!id) return
@@ -153,18 +156,20 @@ export default function NoteDetailPage() {
                     <Calendar size={12} />
                     {note.date}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <Link href={`/note/${id}/edit`} className="action-btn">
-                      <Pencil size={12} /> Edit
-                    </Link>
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="action-btn danger"
-                    >
-                      <Trash2 size={12} /> {deleting ? 'Deleting…' : 'Delete'}
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <Link href={`/note/${id}/edit`} className="action-btn">
+                        <Pencil size={12} /> Edit
+                      </Link>
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="action-btn danger"
+                      >
+                        <Trash2 size={12} /> {deleting ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

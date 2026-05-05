@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { docClient } from '@/lib/dynamodb'
 import { ScanCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import { randomUUID } from 'crypto'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET() {
   try {
@@ -17,6 +19,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json()
     const { title, content, category, tags } = body
