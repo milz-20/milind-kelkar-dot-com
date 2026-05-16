@@ -1,10 +1,26 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import type { ComponentType } from 'react'
 import Link from 'next/link'
-import { Plus, BookOpen, Search, X, SlidersHorizontal } from 'lucide-react'
+import {
+  Plus, BookOpen, Search, X, SlidersHorizontal, ArrowLeft, ChartNetwork, Cloud,
+  Code2, Coffee, Cpu, Layers3, MoreHorizontal, Network, ShieldAlert
+} from 'lucide-react'
 import { Note, CATEGORIES } from '@/lib/notes'
 import { useSession, signIn, signOut } from 'next-auth/react'
+
+const topicDetails: Record<string, { description: string; icon: ComponentType<{ size?: number; color?: string }> }> = {
+  AWS: { description: 'Cloud services, architecture notes, and deployment lessons.', icon: Cloud },
+  Java: { description: 'Language concepts, backend patterns, and everyday Java notes.', icon: Coffee },
+  'Computer Fundamentals': { description: 'Core CS concepts, operating systems, networking, and foundations.', icon: Cpu },
+  'Node.js': { description: 'Server-side JavaScript, APIs, tooling, and runtime behavior.', icon: Code2 },
+  'Next.js': { description: 'React framework notes, routing, rendering, and app structure.', icon: Layers3 },
+  'Web Vulnerabilities': { description: 'Security bugs, attack paths, defenses, and practical web risk.', icon: ShieldAlert },
+  DDD: { description: 'Domain modeling, bounded contexts, aggregates, and design choices.', icon: ChartNetwork },
+  Design: { description: 'System design, architecture tradeoffs, services, and data flow.', icon: Network },
+  Other: { description: 'Loose ideas and useful notes that do not fit one neat shelf.', icon: MoreHorizontal },
+}
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([])
@@ -37,12 +53,34 @@ export default function Home() {
     return result
   }, [notes, activeCategory, search])
 
+  const showTopicOverview = activeCategory === 'All' && !search.trim()
+
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { All: notes.length }
     notes.forEach(n => {
       counts[n.category] = (counts[n.category] || 0) + 1
     })
     return counts
+  }, [notes])
+
+  const topics = useMemo(() => {
+    const knownTopics = CATEGORIES.filter(cat => cat !== 'All')
+    const discoveredTopics = notes
+      .map(note => note.category)
+      .filter(cat => cat && !knownTopics.includes(cat))
+
+    return [...knownTopics, ...Array.from(new Set(discoveredTopics))].map(category => {
+      const categoryNotes = notes.filter(note => note.category === category)
+      return {
+        category,
+        count: categoryNotes.length,
+        latest: categoryNotes[0],
+        details: topicDetails[category] ?? {
+          description: 'Collected notes and references for this topic.',
+          icon: BookOpen,
+        },
+      }
+    })
   }, [notes])
 
   return (
@@ -188,6 +226,48 @@ export default function Home() {
           transform: translateY(-2px);
         }
 
+        .topic-card {
+          min-height: 176px; text-align: left; color: inherit;
+        }
+        .topic-card-head {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 14px; margin-bottom: 18px;
+        }
+        .topic-icon {
+          width: 38px; height: 38px; border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(45,212,191,0.08);
+          border: 1px solid rgba(45,212,191,0.18);
+        }
+        .topic-count {
+          font-size: 11px; color: var(--text-subtle);
+          background: rgba(255,255,255,0.05);
+          border: 1px solid var(--glass-border);
+          padding: 4px 9px; border-radius: 999px;
+        }
+        .topic-title {
+          font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700;
+          color: var(--text-primary); line-height: 1.25; margin-bottom: 8px;
+        }
+        .topic-description {
+          font-size: 12px; line-height: 1.6; color: var(--text-muted);
+          margin-bottom: 16px;
+        }
+        .topic-latest {
+          margin-top: auto; padding-top: 12px; border-top: 1px solid var(--glass-border);
+          font-size: 11px; line-height: 1.45; color: var(--text-subtle);
+        }
+
+        .back-topic-btn {
+          display: inline-flex; align-items: center; gap: 7px;
+          border: 1px solid var(--glass-border); background: var(--glass-bg);
+          color: var(--text-muted); border-radius: 10px;
+          padding: 8px 12px; margin-bottom: 18px;
+          font-family: 'Syne', sans-serif; font-size: 12px;
+          cursor: pointer; transition: all 0.18s ease;
+        }
+        .back-topic-btn:hover { color: var(--accent); border-color: rgba(45,212,191,0.3); }
+
         .divider-label {
           display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
         }
@@ -310,7 +390,7 @@ export default function Home() {
             </h1>
 
             <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.7, fontStyle: 'italic', marginBottom: '28px' }}>
-              Things I'm learning — written to understand, not to impress.
+              Things I&apos;m learning — written to understand, not to impress.
             </p>
 
             {isAdmin && (
@@ -326,7 +406,9 @@ export default function Home() {
               <span>
                 {search
                   ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''} for "${search}"`
-                  : `${filtered.length} ${activeCategory === 'All' ? 'notes' : `in ${activeCategory}`}`
+                  : showTopicOverview
+                    ? `${topics.length} topics`
+                    : `${filtered.length} in ${activeCategory}`
                 }
               </span>
             </div>
@@ -335,46 +417,86 @@ export default function Home() {
               <div className="notes-grid">
                 {[...Array(6)].map((_, i) => <div key={i} className="skeleton" />)}
               </div>
-            ) : filtered.length === 0 ? (
-              <div className="empty-state">
-                {search ? `No notes matching "${search}"` : 'No notes in this category yet.'}
+            ) : showTopicOverview ? (
+              <div className="notes-grid">
+                {topics.map(({ category, count, latest, details }) => {
+                  const TopicIcon = details.icon
+
+                  return (
+                    <button
+                      key={category}
+                      className="note-card topic-card"
+                      onClick={() => setActiveCategory(category)}
+                      aria-label={`Open ${category} notes`}
+                    >
+                      <div className="topic-card-head">
+                        <span className="topic-icon">
+                          <TopicIcon size={18} color="var(--accent)" />
+                        </span>
+                        <span className="topic-count">
+                          {count} {count === 1 ? 'note' : 'notes'}
+                        </span>
+                      </div>
+
+                      <h2 className="topic-title">{category}</h2>
+                      <p className="topic-description">{details.description}</p>
+
+                      <p className="topic-latest">
+                        {latest ? `Latest: ${latest.title}` : 'No notes in this topic yet.'}
+                      </p>
+                    </button>
+                  )
+                })}
               </div>
             ) : (
-              <div className="notes-grid">
-                {filtered.map(note => (
-                  <Link key={note.id} href={`/note/${note.id}`} className="note-card">
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                      <span style={{
-                        fontSize: '10px', fontFamily: 'Syne, sans-serif', fontWeight: 600,
-                        letterSpacing: '0.08em', textTransform: 'uppercase',
-                        padding: '3px 10px', borderRadius: '999px',
-                        background: 'rgba(45,212,191,0.1)', color: 'var(--accent)',
-                        border: '1px solid rgba(45,212,191,0.2)',
-                      }}>
-                        {note.category}
-                      </span>
-                      {note.tags?.slice(0, 2).map(tag => (
-                        <span key={tag} className="tag">{tag}</span>
-                      ))}
-                    </div>
+              <>
+                {activeCategory !== 'All' && (
+                  <button className="back-topic-btn" onClick={() => setActiveCategory('All')}>
+                    <ArrowLeft size={13} /> All topics
+                  </button>
+                )}
+                {filtered.length === 0 ? (
+                  <div className="empty-state">
+                    {search ? `No notes matching "${search}"` : 'No notes in this category yet.'}
+                  </div>
+                ) : (
+                  <div className="notes-grid">
+                    {filtered.map(note => (
+                      <Link key={note.id} href={`/note/${note.id}`} className="note-card">
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                          <span style={{
+                            fontSize: '10px', fontFamily: 'Syne, sans-serif', fontWeight: 600,
+                            letterSpacing: '0.08em', textTransform: 'uppercase',
+                            padding: '3px 10px', borderRadius: '999px',
+                            background: 'rgba(45,212,191,0.1)', color: 'var(--accent)',
+                            border: '1px solid rgba(45,212,191,0.2)',
+                          }}>
+                            {note.category}
+                          </span>
+                          {note.tags?.slice(0, 2).map(tag => (
+                            <span key={tag} className="tag">{tag}</span>
+                          ))}
+                        </div>
 
-                    <h2 style={{
-                      fontFamily: 'Syne, sans-serif', fontSize: '14px', fontWeight: 600,
-                      marginBottom: '7px', color: 'var(--text-primary)', lineHeight: 1.35, flexGrow: 1,
-                    }}>
-                      {note.title}
-                    </h2>
+                        <h2 style={{
+                          fontFamily: 'Syne, sans-serif', fontSize: '14px', fontWeight: 600,
+                          marginBottom: '7px', color: 'var(--text-primary)', lineHeight: 1.35, flexGrow: 1,
+                        }}>
+                          {note.title}
+                        </h2>
 
-                    <p style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--text-muted)', marginBottom: '12px' }}>
-                      {note.preview}
-                    </p>
+                        <p style={{ fontSize: '12px', lineHeight: 1.6, color: 'var(--text-muted)', marginBottom: '12px' }}>
+                          {note.preview}
+                        </p>
 
-                    <p style={{ fontSize: '11px', color: 'var(--text-subtle)', marginTop: 'auto' }}>
-                      {note.date}
-                    </p>
-                  </Link>
-                ))}
-              </div>
+                        <p style={{ fontSize: '11px', color: 'var(--text-subtle)', marginTop: 'auto' }}>
+                          {note.date}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

@@ -63,6 +63,11 @@ export default function NoteDetailPage() {
         }
         .note-content hr { border:none; border-top: 1px solid var(--glass-border); margin: 24px 0; }
         .note-content a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+        .note-content img {
+          display: block; max-width: 100%; height: auto;
+          border: 1px solid var(--glass-border); border-radius: 10px;
+          margin: 18px 0; background: #fff;
+        }
 
         .action-btn {
           display: inline-flex; align-items: center; gap: 6px;

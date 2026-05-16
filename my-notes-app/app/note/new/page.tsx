@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -9,9 +10,10 @@ import Image from '@tiptap/extension-image'
 import Link from 'next/link'
 import {
   ArrowLeft, Bold, Italic, Code, Heading1, Heading2,
-  List, ListOrdered, Quote, Minus, RotateCcw, RotateCw
+  List, ListOrdered, Quote, Minus, RotateCcw, RotateCw, ImagePlus
 } from 'lucide-react'
 import { CATEGORIES } from '@/lib/notes'
+import { imageFileToDataUrl } from '@/lib/editor-images'
 
 export default function NewNotePage() {
   const router = useRouter()
@@ -57,6 +59,24 @@ export default function NewNotePage() {
     }
   }
 
+  const handleImageImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !editor) return
+
+    setError('')
+    try {
+      const src = await imageFileToDataUrl(file)
+      editor.chain().focus().setImage({ src, alt: file.name }).run()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not import that image.')
+    }
+  }
+
+  const openImagePicker = () => {
+    document.getElementById('new-note-image-input')?.click()
+  }
+
   const toolbarGroups = [
     [
       { icon: <Heading1 size={15} />, label: 'H1', action: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(), isActive: () => editor?.isActive('heading', { level: 1 }) ?? false },
@@ -74,6 +94,7 @@ export default function NewNotePage() {
       { icon: <Minus size={15} />, label: 'Divider', action: () => editor?.chain().focus().setHorizontalRule().run(), isActive: () => false },
     ],
     [
+      { icon: <ImagePlus size={15} />, label: 'Insert image', action: openImagePicker, isActive: () => false },
       { icon: <RotateCcw size={15} />, label: 'Undo', action: () => editor?.chain().focus().undo().run(), isActive: () => false },
       { icon: <RotateCw size={15} />, label: 'Redo', action: () => editor?.chain().focus().redo().run(), isActive: () => false },
     ],
@@ -111,6 +132,11 @@ export default function NewNotePage() {
         .note-editor li { margin: 3px 0; }
         .note-editor blockquote { border-left: 2px solid var(--accent); margin: 14px 0; padding: 4px 0 4px 16px; color: var(--text-muted); font-style: italic; }
         .note-editor hr { border: none; border-top: 1px solid var(--glass-border); margin: 20px 0; }
+        .note-editor img {
+          display: block; max-width: 100%; height: auto;
+          border: 1px solid var(--glass-border); border-radius: 10px;
+          margin: 16px 0; background: #fff;
+        }
 
         .toolbar-btn {
           display: flex; align-items: center; justify-content: center;
@@ -177,7 +203,7 @@ export default function NewNotePage() {
               fontFamily: 'Syne, sans-serif', fontSize: '32px', fontWeight: 700,
               color: 'var(--text-primary)', lineHeight: 1.2
             }}>
-              What's on your mind?
+              What&apos;s on your mind?
             </h1>
           </div>
 
@@ -221,6 +247,13 @@ export default function NewNotePage() {
 
           {/* Editor */}
           <div className="glass" style={{ padding: 0, marginBottom: '20px' }}>
+            <input
+              id="new-note-image-input"
+              type="file"
+              accept="image/*"
+              onChange={handleImageImport}
+              style={{ display: 'none' }}
+            />
             {/* Toolbar */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '2px',
