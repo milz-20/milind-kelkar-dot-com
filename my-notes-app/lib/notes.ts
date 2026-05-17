@@ -8,6 +8,13 @@ export type Note = {
   date: string
 }
 
+export type Topic = {
+  id: string
+  category: string
+  name: string
+  description?: string
+}
+
 export const CATEGORIES = [
   'All',
   'AWS',

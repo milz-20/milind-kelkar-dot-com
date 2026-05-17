@@ -8,7 +8,9 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 export async function GET() {
   try {
     const result = await docClient.send(new ScanCommand({ TableName: 'Notes' }))
-    const notes = (result.Items ?? []).sort(
+    const notes = (result.Items ?? [])
+      .filter(item => item.itemType !== 'topic')
+      .sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     )
     return NextResponse.json(notes)

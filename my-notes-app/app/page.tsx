@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ComponentType } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, BookOpen, ChartNetwork, Cloud, Code2, Coffee, Cpu, Layers3,
-  LibraryBig, MoreHorizontal, Network, Plus, Search, ShieldAlert, X
+  LibraryBig, MoreHorizontal, Network, Pencil, Plus, Search, ShieldAlert, X
 } from 'lucide-react'
-import { Note, CATEGORIES } from '@/lib/notes'
+import { Note, Topic, CATEGORIES } from '@/lib/notes'
 import { useSession, signIn, signOut } from 'next-auth/react'
 
 const topicDetails: Record<string, { label?: string; description: string; icon: ComponentType<{ size?: number; color?: string }> }> = {
@@ -22,22 +22,55 @@ const topicDetails: Record<string, { label?: string; description: string; icon: 
   Other: { description: 'Loose ideas and useful notes that do not fit one neat shelf.', icon: MoreHorizontal },
 }
 
-const displayTopicName = (category: string) => topicDetails[category]?.label ?? category
-
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([])
+  const [topicShelves, setTopicShelves] = useState<Topic[]>([])
   const [activeCategory, setActiveCategory] = useState('All')
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [topicDialog, setTopicDialog] = useState<{
+    mode: 'add' | 'rename'
+    category?: string
+    value: string
+    description: string
+    saving: boolean
+    error: string
+  } | null>(null)
   const { data: session } = useSession()
   const isAdmin = !!session
 
   useEffect(() => {
-    fetch('/api/notes')
-      .then(r => r.json())
-      .then(data => { setNotes(data); setLoading(false) })
+    Promise.all([
+      fetch('/api/notes').then(r => r.json()),
+      fetch('/api/topics').then(r => r.json()).catch(() => []),
+    ])
+      .then(([notesData, topicsData]) => {
+        setNotes(notesData)
+        setTopicShelves(topicsData)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
+
+  const topicNameByCategory = useMemo(() => {
+    const names: Record<string, string> = {}
+    topicShelves.forEach(topic => {
+      names[topic.category] = topic.name
+    })
+    return names
+  }, [topicShelves])
+
+  const topicDescriptionByCategory = useMemo(() => {
+    const descriptions: Record<string, string> = {}
+    topicShelves.forEach(topic => {
+      if (topic.description) descriptions[topic.category] = topic.description
+    })
+    return descriptions
+  }, [topicShelves])
+
+  const displayTopicName = useCallback((category: string) =>
+    topicNameByCategory[category] ?? topicDetails[category]?.label ?? category
+  , [topicNameByCategory])
 
   const filtered = useMemo(() => {
     let result = activeCategory === 'All'
@@ -66,7 +99,7 @@ export default function Home() {
   }, [notes])
 
   const topics = useMemo(() => {
-    const knownTopics = CATEGORIES.filter(cat => cat !== 'All')
+    const knownTopics = topicShelves.map(topic => topic.category)
     const discoveredTopics = notes
       .map(note => note.category)
       .filter(cat => cat && !knownTopics.includes(cat))
@@ -78,9 +111,15 @@ export default function Home() {
           category,
           count: categoryNotes.length,
           latest: categoryNotes[0],
-          details: topicDetails[category] ?? {
-            description: 'Collected notes and references for this topic.',
-            icon: BookOpen,
+          name: displayTopicName(category),
+          details: {
+            ...(topicDetails[category] ?? {
+              description: 'Collected notes and references for this topic.',
+              icon: BookOpen,
+            }),
+            description: topicDescriptionByCategory[category] ??
+              topicDetails[category]?.description ??
+              'Collected notes and references for this topic.',
           },
         }
       })
@@ -89,11 +128,76 @@ export default function Home() {
         if (b.count === 0 && a.count > 0) return -1
         return CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category)
       })
-  }, [notes])
+  }, [notes, topicShelves, displayTopicName, topicDescriptionByCategory])
 
   const recentNotes = useMemo(() => notes.slice(0, 6), [notes])
   const showLibraryHome = activeCategory === 'All' && !search.trim()
   const activeTopicLabel = displayTopicName(activeCategory)
+
+  const refreshTopics = async () => {
+    const res = await fetch('/api/topics')
+    if (!res.ok) throw new Error('Failed to refresh topics')
+    setTopicShelves(await res.json())
+  }
+
+  const openAddTopicDialog = () => {
+    setTopicDialog({ mode: 'add', value: '', description: '', saving: false, error: '' })
+  }
+
+  const openRenameTopicDialog = (category: string, currentName: string, currentDescription: string) => {
+    setTopicDialog({
+      mode: 'rename',
+      category,
+      value: currentName,
+      description: currentDescription,
+      saving: false,
+      error: '',
+    })
+  }
+
+  const closeTopicDialog = () => {
+    if (topicDialog?.saving) return
+    setTopicDialog(null)
+  }
+
+  const handleTopicDialogSubmit = async () => {
+    if (!topicDialog) return
+
+    const name = topicDialog.value.trim()
+    const description = topicDialog.description.trim()
+    if (!name) {
+      setTopicDialog({ ...topicDialog, error: 'Add a shelf name.' })
+      return
+    }
+
+    setTopicDialog({ ...topicDialog, saving: true, error: '' })
+
+    const res = topicDialog.mode === 'add'
+      ? await fetch('/api/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      })
+      : await fetch(`/api/topics/${encodeURIComponent(topicDialog.category || '')}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      })
+
+    if (!res.ok) {
+      setTopicDialog({
+        ...topicDialog,
+        saving: false,
+        error: topicDialog.mode === 'add'
+          ? 'Could not add that topic shelf.'
+          : 'Could not rename that topic shelf.',
+      })
+      return
+    }
+
+    await refreshTopics()
+    setTopicDialog(null)
+  }
 
   return (
     <>
@@ -253,6 +357,28 @@ export default function Home() {
           font-size: 12px; color: var(--text-subtle);
         }
 
+        .section-actions {
+          display: flex; align-items: center; gap: 10px;
+        }
+
+        .shelf-action-btn, .topic-edit-btn {
+          display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+          border: 1px solid var(--glass-border);
+          background: rgba(255,255,255,0.025);
+          color: var(--text-muted);
+          cursor: pointer; transition: all 0.15s ease;
+        }
+
+        .shelf-action-btn {
+          height: 32px; border-radius: 10px; padding: 0 11px;
+          font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600;
+        }
+
+        .shelf-action-btn:hover, .topic-edit-btn:hover {
+          color: var(--accent); border-color: rgba(45,212,191,0.3);
+          background: rgba(45,212,191,0.06);
+        }
+
         .topic-grid {
           display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
           animation: fadeUp 0.5s ease both;
@@ -294,6 +420,14 @@ export default function Home() {
           background: rgba(255,255,255,0.05);
           border: 1px solid var(--glass-border);
           padding: 4px 9px; border-radius: 999px;
+        }
+
+        .topic-card-tools {
+          display: flex; align-items: center; gap: 7px;
+        }
+
+        .topic-edit-btn {
+          width: 28px; height: 28px; border-radius: 9px;
         }
 
         .topic-title {
@@ -381,6 +515,77 @@ export default function Home() {
           border-radius: 12px; padding: 42px 20px;
           text-align: center; color: var(--text-subtle);
           font-family: 'Syne', sans-serif; font-size: 14px;
+        }
+
+        .dialog-backdrop {
+          position: fixed; inset: 0; z-index: 100;
+          display: flex; align-items: center; justify-content: center;
+          padding: 20px; background: rgba(0,0,0,0.58);
+          backdrop-filter: blur(10px);
+        }
+
+        .topic-dialog {
+          width: min(420px, 100%);
+          border: 1px solid var(--glass-border);
+          background: rgba(18,18,22,0.96);
+          border-radius: 14px; padding: 22px;
+          box-shadow: 0 20px 70px rgba(0,0,0,0.45);
+        }
+
+        .dialog-title {
+          font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700;
+          color: var(--text-primary); margin-bottom: 8px;
+        }
+
+        .dialog-copy {
+          font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 18px;
+        }
+
+        .dialog-input {
+          width: 100%; height: 42px; border-radius: 10px;
+          border: 1px solid var(--glass-border);
+          background: rgba(255,255,255,0.04);
+          color: var(--text-primary); outline: none;
+          padding: 0 12px; font-size: 14px; caret-color: var(--accent);
+        }
+
+        .dialog-textarea {
+          width: 100%; min-height: 96px; resize: vertical; border-radius: 10px;
+          border: 1px solid var(--glass-border);
+          background: rgba(255,255,255,0.04);
+          color: var(--text-primary); outline: none;
+          padding: 10px 12px; font-size: 13px; line-height: 1.55;
+          caret-color: var(--accent); margin-top: 10px;
+        }
+
+        .dialog-input:focus, .dialog-textarea:focus { border-color: rgba(45,212,191,0.35); }
+
+        .dialog-error {
+          color: #f87171; font-size: 12px; margin-top: 10px;
+        }
+
+        .dialog-actions {
+          display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;
+        }
+
+        .dialog-btn {
+          height: 38px; border-radius: 10px; padding: 0 14px;
+          font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+          cursor: pointer; transition: all 0.16s ease;
+        }
+
+        .dialog-btn.secondary {
+          border: 1px solid var(--glass-border);
+          background: transparent; color: var(--text-muted);
+        }
+
+        .dialog-btn.primary {
+          border: 1px solid rgba(45,212,191,0.35);
+          background: rgba(45,212,191,0.12); color: var(--accent);
+        }
+
+        .dialog-btn:disabled {
+          opacity: 0.55; cursor: not-allowed;
         }
 
         .skeleton {
@@ -483,14 +688,14 @@ export default function Home() {
           </section>
 
           <div className="filter-row" aria-label="Topic filters">
-            {CATEGORIES.map(cat => (
+            {[{ category: 'All', name: 'All' }, ...topicShelves].map(topic => (
               <button
-                key={cat}
-                className={`filter-chip ${activeCategory === cat ? 'active' : ''}`}
-                onClick={() => setActiveCategory(cat)}
+                key={topic.category}
+                className={`filter-chip ${activeCategory === topic.category ? 'active' : ''}`}
+                onClick={() => setActiveCategory(topic.category)}
               >
-                {cat === 'All' ? 'All' : displayTopicName(cat)}
-                <span>{categoryCounts[cat] || 0}</span>
+                {topic.name}
+                <span>{categoryCounts[topic.category] || 0}</span>
               </button>
             ))}
           </div>
@@ -510,34 +715,59 @@ export default function Home() {
               <section>
                 <div className="section-head">
                   <h2 className="section-title">Topic Shelves</h2>
-                  <span className="section-meta">{topics.length} topic{topics.length !== 1 ? 's' : ''}</span>
+                  <div className="section-actions">
+                    <span className="section-meta">{topics.length} topic{topics.length !== 1 ? 's' : ''}</span>
+                    {isAdmin && (
+                      <button className="shelf-action-btn" onClick={openAddTopicDialog}>
+                        <Plus size={12} /> Add Shelf
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="topic-grid">
-                  {topics.map(({ category, count, latest, details }) => {
+                  {topics.map(({ category, count, latest, name, details }) => {
                     const TopicIcon = details.icon
 
                     return (
-                      <button
+                      <div
                         key={category}
                         className="topic-card"
                         onClick={() => setActiveCategory(category)}
+                        onKeyDown={event => event.key === 'Enter' && setActiveCategory(category)}
+                        role="button"
+                        tabIndex={0}
                         aria-label={`Open ${displayTopicName(category)} notes`}
                       >
                         <div className="topic-top">
                           <span className="topic-icon">
                             <TopicIcon size={18} color="var(--accent)" />
                           </span>
-                          <span className="topic-count">
-                            {count} {count === 1 ? 'note' : 'notes'}
+                          <span className="topic-card-tools">
+                            {isAdmin && (
+                              <button
+                                className="topic-edit-btn"
+                                onClick={event => {
+                                  event.stopPropagation()
+                                  openRenameTopicDialog(category, name, details.description)
+                                }}
+                                aria-label={`Rename ${name}`}
+                                title="Rename shelf"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            )}
+                            <span className="topic-count">
+                              {count} {count === 1 ? 'note' : 'notes'}
+                            </span>
                           </span>
                         </div>
 
-                        <h3 className="topic-title">{displayTopicName(category)}</h3>
+                        <h3 className="topic-title">{name}</h3>
                         <p className="topic-description">{details.description}</p>
                         <p className="topic-latest">
                           {latest ? `Latest: ${latest.title}` : 'No notes in this topic yet.'}
                         </p>
-                      </button>
+                      </div>
                     )
                   })}
                 </div>
@@ -553,7 +783,7 @@ export default function Home() {
                 ) : (
                   <div className="note-grid">
                     {recentNotes.map(note => (
-                      <NoteCard key={note.id} note={note} />
+                      <NoteCard key={note.id} note={note} getTopicName={displayTopicName} />
                     ))}
                   </div>
                 )}
@@ -585,23 +815,83 @@ export default function Home() {
               ) : (
                 <div className="note-grid">
                   {filtered.map(note => (
-                    <NoteCard key={note.id} note={note} />
+                    <NoteCard key={note.id} note={note} getTopicName={displayTopicName} />
                   ))}
                 </div>
               )}
             </section>
           )}
         </div>
+
+        {topicDialog && (
+          <div
+            className="dialog-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="topic-dialog-title"
+            onMouseDown={closeTopicDialog}
+          >
+            <div className="topic-dialog" onMouseDown={event => event.stopPropagation()}>
+              <h2 id="topic-dialog-title" className="dialog-title">
+                {topicDialog.mode === 'add' ? 'Add Topic Shelf' : 'Rename Topic Shelf'}
+              </h2>
+              <p className="dialog-copy">
+                {topicDialog.mode === 'add'
+                  ? 'Create a shelf for a new group of notes and describe what belongs there.'
+                  : 'Change the display name or summary for this shelf. Existing notes stay in the same category.'}
+              </p>
+              <input
+                className="dialog-input"
+                value={topicDialog.value}
+                onChange={event => setTopicDialog({ ...topicDialog, value: event.target.value, error: '' })}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') handleTopicDialogSubmit()
+                  if (event.key === 'Escape') closeTopicDialog()
+                }}
+                autoFocus
+                placeholder="e.g. Distributed Systems"
+              />
+              <textarea
+                className="dialog-textarea"
+                value={topicDialog.description}
+                onChange={event => setTopicDialog({ ...topicDialog, description: event.target.value, error: '' })}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') closeTopicDialog()
+                }}
+                placeholder="Write a short shelf summary..."
+              />
+              {topicDialog.error && (
+                <p className="dialog-error">{topicDialog.error}</p>
+              )}
+              <div className="dialog-actions">
+                <button
+                  className="dialog-btn secondary"
+                  onClick={closeTopicDialog}
+                  disabled={topicDialog.saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="dialog-btn primary"
+                  onClick={handleTopicDialogSubmit}
+                  disabled={topicDialog.saving}
+                >
+                  {topicDialog.saving ? 'Saving...' : topicDialog.mode === 'add' ? 'Add Shelf' : 'Save Shelf'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </>
   )
 }
 
-function NoteCard({ note }: { note: Note }) {
+function NoteCard({ note, getTopicName }: { note: Note; getTopicName: (category: string) => string }) {
   return (
     <Link href={`/note/${note.id}`} className="note-card">
       <div className="note-meta-row">
-        <span className="category-pill">{displayTopicName(note.category)}</span>
+        <span className="category-pill">{getTopicName(note.category)}</span>
         {note.tags?.slice(0, 2).map(tag => (
           <span key={tag} className="tag">{tag}</span>
         ))}

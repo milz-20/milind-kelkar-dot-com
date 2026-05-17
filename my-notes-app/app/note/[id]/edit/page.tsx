@@ -12,7 +12,7 @@ import {
   ArrowLeft, Bold, Italic, Code, Heading1, Heading2,
   List, ListOrdered, Quote, Minus, RotateCcw, RotateCw, ImagePlus
 } from 'lucide-react'
-import { CATEGORIES, Note } from '@/lib/notes'
+import { CATEGORIES, Note, Topic } from '@/lib/notes'
 import { imageFileToDataUrl } from '@/lib/editor-images'
 
 export default function EditNotePage() {
@@ -23,6 +23,9 @@ export default function EditNotePage() {
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState('')
   const [category, setCategory] = useState('Other')
+  const [topics, setTopics] = useState<Topic[]>(
+    CATEGORIES.filter(c => c !== 'All').map(c => ({ id: c, category: c, name: c }))
+  )
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -39,6 +42,13 @@ export default function EditNotePage() {
       attributes: { class: 'note-editor' },
     },
   })
+
+  useEffect(() => {
+    fetch('/api/topics')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((data: Topic[]) => setTopics(data))
+      .catch(() => {})
+  }, [])
 
   // Fetch existing note and populate fields
   useEffect(() => {
@@ -210,8 +220,8 @@ export default function EditNotePage() {
                     Category
                   </label>
                   <select className="cat-select" value={category} onChange={e => setCategory(e.target.value)}>
-                    {CATEGORIES.filter(c => c !== 'All').map(c => (
-                      <option key={c} value={c}>{c}</option>
+                    {topics.map(topic => (
+                      <option key={topic.category} value={topic.category}>{topic.name}</option>
                     ))}
                   </select>
                 </div>

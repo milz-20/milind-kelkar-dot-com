@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -12,7 +12,7 @@ import {
   ArrowLeft, Bold, Italic, Code, Heading1, Heading2,
   List, ListOrdered, Quote, Minus, RotateCcw, RotateCw, ImagePlus
 } from 'lucide-react'
-import { CATEGORIES } from '@/lib/notes'
+import { CATEGORIES, Topic } from '@/lib/notes'
 import { imageFileToDataUrl } from '@/lib/editor-images'
 
 export default function NewNotePage() {
@@ -20,8 +20,18 @@ export default function NewNotePage() {
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState('')
   const [category, setCategory] = useState('Other')
+  const [topics, setTopics] = useState<Topic[]>(
+    CATEGORIES.filter(c => c !== 'All').map(c => ({ id: c, category: c, name: c }))
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetch('/api/topics')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((data: Topic[]) => setTopics(data))
+      .catch(() => {})
+  }, [])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -224,8 +234,8 @@ export default function NewNotePage() {
                 Category
               </label>
               <select className="cat-select" value={category} onChange={e => setCategory(e.target.value)}>
-                {CATEGORIES.filter(c => c !== 'All').map(c => (
-                  <option key={c} value={c}>{c}</option>
+                {topics.map(topic => (
+                  <option key={topic.category} value={topic.category}>{topic.name}</option>
                 ))}
               </select>
             </div>
