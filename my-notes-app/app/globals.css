@@ -3,6 +3,14 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@font-face {
+  font-family: 'Excalifont';
+  src: url('/fonts/Excalifont-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-base: #0e0e11;
   --bg-surface: #16161a;
@@ -16,6 +24,7 @@
   --text-primary: rgba(255, 255, 255, 0.88);
   --text-muted: rgba(255, 255, 255, 0.4);
   --text-subtle: rgba(255, 255, 255, 0.22);
+  --font-hand: 'Excalifont', cursive;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

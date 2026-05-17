@@ -308,6 +308,8 @@ export default function Home() {
 
         .accent-word {
           color: var(--accent); position: relative; display: inline-block;
+          font-family: var(--font-hand);
+          font-weight: 700;
         }
 
         .accent-word::after {

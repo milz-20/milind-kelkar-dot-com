@@ -10,10 +10,11 @@ import Image from '@tiptap/extension-image'
 import Link from 'next/link'
 import {
   ArrowLeft, Bold, Italic, Code, Heading1, Heading2,
-  List, ListOrdered, Quote, Minus, RotateCcw, RotateCw, ImagePlus
+  List, ListOrdered, Quote, Minus, RotateCcw, RotateCw, ImagePlus, Signature
 } from 'lucide-react'
 import { CATEGORIES, Topic } from '@/lib/notes'
 import { imageFileToDataUrl } from '@/lib/editor-images'
+import { HandFont } from '@/lib/hand-font'
 
 export default function NewNotePage() {
   const router = useRouter()
@@ -38,6 +39,7 @@ export default function NewNotePage() {
     extensions: [
       StarterKit,
       Image,
+      HandFont,
       Placeholder.configure({ placeholder: "What's on your mind? Start writing…" }),
     ],
     content: '',
@@ -96,6 +98,7 @@ export default function NewNotePage() {
       { icon: <Bold size={15} />, label: 'Bold', action: () => editor?.chain().focus().toggleBold().run(), isActive: () => editor?.isActive('bold') ?? false },
       { icon: <Italic size={15} />, label: 'Italic', action: () => editor?.chain().focus().toggleItalic().run(), isActive: () => editor?.isActive('italic') ?? false },
       { icon: <Code size={15} />, label: 'Code', action: () => editor?.chain().focus().toggleCode().run(), isActive: () => editor?.isActive('code') ?? false },
+      { icon: <Signature size={15} />, label: 'Handwritten font', action: () => editor?.chain().focus().toggleMark('handFont').run(), isActive: () => editor?.isActive('handFont') ?? false },
     ],
     [
       { icon: <List size={15} />, label: 'Bullet list', action: () => editor?.chain().focus().toggleBulletList().run(), isActive: () => editor?.isActive('bulletList') ?? false },
@@ -142,6 +145,7 @@ export default function NewNotePage() {
         .note-editor li { margin: 3px 0; }
         .note-editor blockquote { border-left: 2px solid var(--accent); margin: 14px 0; padding: 4px 0 4px 16px; color: var(--text-muted); font-style: italic; }
         .note-editor hr { border: none; border-top: 1px solid var(--glass-border); margin: 20px 0; }
+        .note-editor .hand-font { font-family: var(--font-hand); font-size: 1.08em; color: var(--text-primary); }
         .note-editor img {
           display: block; max-width: 100%; height: auto;
           border: 1px solid var(--glass-border); border-radius: 10px;
