@@ -9,12 +9,13 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
 import Link from 'next/link'
 import {
-  ArrowLeft, Bold, Italic, Code, Heading1, Heading2,
+  ArrowLeft, Bold, Italic, Code, Braces, Heading1, Heading2,
   List, ListOrdered, Quote, Minus, RotateCcw, RotateCw, ImagePlus, Signature
 } from 'lucide-react'
 import { CATEGORIES, Note, Topic } from '@/lib/notes'
 import { imageFileToDataUrl } from '@/lib/editor-images'
 import { HandFont } from '@/lib/hand-font'
+import { DEFAULT_CODE_LANGUAGE, CodeBlockWithLanguage } from '@/lib/editor-code-block'
 
 export default function EditNotePage() {
   const params = useParams()
@@ -30,11 +31,13 @@ export default function EditNotePage() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isCodeBlockActive, setIsCodeBlockActive] = useState(false)
 
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({ codeBlock: false }),
+      CodeBlockWithLanguage,
       Image,
       HandFont,
       Placeholder.configure({ placeholder: "What's on your mind? Start writing…" }),
@@ -42,6 +45,12 @@ export default function EditNotePage() {
     content: '',
     editorProps: {
       attributes: { class: 'note-editor' },
+    },
+    onSelectionUpdate: ({ editor }) => {
+      setIsCodeBlockActive(editor.isActive('codeBlock'))
+    },
+    onUpdate: ({ editor }) => {
+      setIsCodeBlockActive(editor.isActive('codeBlock'))
     },
   })
 
@@ -117,6 +126,7 @@ export default function EditNotePage() {
       { icon: <Bold size={15} />, label: 'Bold', action: () => editor?.chain().focus().toggleBold().run(), isActive: () => editor?.isActive('bold') ?? false },
       { icon: <Italic size={15} />, label: 'Italic', action: () => editor?.chain().focus().toggleItalic().run(), isActive: () => editor?.isActive('italic') ?? false },
       { icon: <Code size={15} />, label: 'Code', action: () => editor?.chain().focus().toggleCode().run(), isActive: () => editor?.isActive('code') ?? false },
+      { icon: <Braces size={15} />, label: 'Code block', action: () => editor?.chain().focus().toggleCodeBlock({ language: DEFAULT_CODE_LANGUAGE }).run(), isActive: () => isCodeBlockActive },
       { icon: <Signature size={15} />, label: 'Handwritten font', action: () => editor?.chain().focus().toggleMark('handFont').run(), isActive: () => editor?.isActive('handFont') ?? false },
     ],
     [
@@ -151,8 +161,27 @@ export default function EditNotePage() {
         .note-editor strong { font-weight:600; }
         .note-editor em { color:rgba(255,255,255,0.7); font-style:italic; }
         .note-editor code { font-size:13px; background:rgba(45,212,191,0.08); border:1px solid rgba(45,212,191,0.18); border-radius:5px; padding:2px 7px; color:var(--accent); }
-        .note-editor pre { background:rgba(0,0,0,0.35); border:1px solid var(--glass-border); border-radius:10px; padding:16px 20px; margin:14px 0; overflow-x:auto; }
-        .note-editor pre code { background:none; border:none; padding:0; color:rgba(255,255,255,0.8); }
+        .note-editor .editor-code-block { background:#0b0f19; border:1px solid rgba(148,163,184,0.26); border-radius:8px; margin:16px 0; overflow:hidden; box-shadow:inset 0 1px 0 rgba(255,255,255,0.03); }
+        .note-editor .editor-code-block[data-language="javascript"] { border-color:rgba(255,203,107,0.34); }
+        .note-editor .editor-code-block[data-language="typescript"] { border-color:rgba(130,170,255,0.38); }
+        .note-editor .editor-code-block[data-language="json"] { border-color:rgba(137,221,255,0.36); }
+        .note-editor .editor-code-block[data-language="java"] { border-color:rgba(247,140,108,0.34); }
+        .note-editor .editor-code-header { min-height:40px; display:flex; align-items:center; padding:0 14px; border-bottom:1px solid rgba(148,163,184,0.22); }
+        .note-editor .editor-code-language-select { height:28px; min-width:132px; border:none; border-radius:6px; background:rgba(255,255,255,0.045); color:rgba(226,232,240,0.86); font-family:'Syne',sans-serif; font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; padding:0 26px 0 9px; outline:none; cursor:pointer; }
+        .note-editor .editor-code-language-select:focus { box-shadow:0 0 0 1px rgba(45,212,191,0.45); }
+        .note-editor .editor-code-language-select option { background:#16161a; color:var(--text-primary); }
+        .note-editor pre { background:transparent; border:none; border-radius:0; padding:18px 20px; margin:0; overflow-x:auto; }
+        .note-editor pre code { display:block; background:none; border:none; padding:0; color:rgba(226,232,240,0.9); font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.75; white-space:pre; }
+        .note-editor .tok-keyword { color:#82aaff; }
+        .note-editor .tok-string { color:#c3e88d; }
+        .note-editor .tok-number { color:#f78c6c; }
+        .note-editor .tok-comment { color:#7a859d; font-style:italic; }
+        .note-editor .tok-function { color:#ffcb6b; }
+        .note-editor .tok-type { color:#c792ea; }
+        .note-editor .tok-boolean { color:#ff9cac; }
+        .note-editor .tok-property { color:#89ddff; }
+        .note-editor .tok-variable { color:#d7deea; }
+        .note-editor .tok-operator { color:#d4bfff; }
         .note-editor ul, .note-editor ol { padding-left:22px; margin:8px 0; color:var(--text-muted); }
         .note-editor li { margin:3px 0; }
         .note-editor blockquote { border-left:2px solid var(--accent); margin:14px 0; padding:4px 0 4px 16px; color:var(--text-muted); font-style:italic; }

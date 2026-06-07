@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, Calendar, Tag, Pencil, Trash2 } from 'lucide-react'
 import { Note } from '@/lib/notes'
 import { useSession } from 'next-auth/react'
+import { highlightCode } from '@/lib/code-highlight'
 
 export default function NoteDetailPage() {
   const params = useParams()
@@ -35,6 +36,57 @@ export default function NoteDetailPage() {
     router.push('/')
   }
 
+  useEffect(() => {
+    if (!note) return
+
+    document.querySelectorAll<HTMLPreElement>('.note-content pre').forEach(pre => {
+      if (pre.dataset.enhanced === 'true') return
+
+      const code = pre.querySelector('code')
+      const classLanguage = Array.from(code?.classList ?? [])
+        .find(className => className.startsWith('language-'))
+        ?.replace('language-', '')
+      const language = pre.dataset.language || classLanguage || 'code'
+      const rawCode = code?.textContent ?? ''
+
+      pre.dataset.language = language
+      pre.dataset.enhanced = 'true'
+      pre.classList.add('note-code-pre')
+      if (code) {
+        code.innerHTML = highlightCode(rawCode, language)
+      }
+
+      const parent = pre.parentNode
+      if (!parent) return
+
+      const shell = document.createElement('div')
+      shell.className = 'note-code-block'
+      shell.dataset.language = language
+
+      const header = document.createElement('div')
+      header.className = 'note-code-header'
+
+      const label = document.createElement('span')
+      label.textContent = language
+
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'note-code-copy'
+      button.textContent = 'Copy'
+      button.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(rawCode)
+        button.textContent = 'Copied'
+        window.setTimeout(() => {
+          button.textContent = 'Copy'
+        }, 1200)
+      })
+
+      header.append(label, button)
+      parent.insertBefore(shell, pre)
+      shell.append(header, pre)
+    })
+  }, [note])
+
   return (
     <>
       <style>{`
@@ -51,10 +103,46 @@ export default function NoteDetailPage() {
           padding: 2px 7px; color: var(--accent);
         }
         .note-content pre {
-          background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border);
-          border-radius: 12px; padding: 18px 22px; margin: 16px 0; overflow-x: auto;
+          background: transparent; border: none;
+          border-radius: 0; padding: 18px 20px; margin: 0; overflow-x: auto;
         }
-        .note-content pre code { background:none; border:none; padding:0; color:rgba(255,255,255,0.82); font-size:13px; }
+        .note-content pre code {
+          display: block; background: none; border: none; padding: 0;
+          color: #d7deea; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-size: 13px; line-height: 1.75; white-space: pre;
+        }
+        .note-code-block {
+          border: 1px solid rgba(148,163,184,0.26);
+          border-radius: 8px; background: #0b0f19; margin: 18px 0;
+          overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+        }
+        .note-code-block[data-language="javascript"] { border-color: rgba(255,203,107,0.34); }
+        .note-code-block[data-language="typescript"] { border-color: rgba(130,170,255,0.38); }
+        .note-code-block[data-language="json"] { border-color: rgba(137,221,255,0.36); }
+        .note-code-block[data-language="java"] { border-color: rgba(247,140,108,0.34); }
+        .note-code-header {
+          min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          padding: 0 16px; border-bottom: 1px solid rgba(148,163,184,0.22);
+          color: rgba(226,232,240,0.78); font-family: 'Syne', sans-serif;
+          font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+        }
+        .note-code-copy {
+          display: inline-flex; align-items: center; justify-content: center;
+          border: none; background: transparent; color: rgba(226,232,240,0.86);
+          font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+          cursor: pointer; padding: 6px 0; min-width: 44px;
+        }
+        .note-code-copy:hover { color: var(--accent); }
+        .tok-keyword { color: #82aaff; }
+        .tok-string { color: #c3e88d; }
+        .tok-number { color: #f78c6c; }
+        .tok-comment { color: #7a859d; font-style: italic; }
+        .tok-function { color: #ffcb6b; }
+        .tok-type { color: #c792ea; }
+        .tok-boolean { color: #ff9cac; }
+        .tok-property { color: #89ddff; }
+        .tok-variable { color: #d7deea; }
+        .tok-operator { color: #d4bfff; }
         .note-content ul, .note-content ol { padding-left: 22px; margin: 10px 0 14px; }
         .note-content li { margin: 5px 0; }
         .note-content blockquote {
