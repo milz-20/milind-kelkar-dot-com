@@ -41,7 +41,7 @@ export default function NewNotePage() {
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       CodeBlockWithLanguage,
-      Image,
+      Image.configure({ allowBase64: true }),
       HandFont,
       Placeholder.configure({ placeholder: "What's on your mind? Start writing…" }),
     ],
